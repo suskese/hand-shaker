@@ -1,0 +1,10 @@
+
+Kick Mode: Fabric
+# "Force" will kick all clients without Hand Shaker mod and with blacklisted mod, while "Fabric" will only kick Fabric clients without Hand Shaker mod or blacklisted mod.
+
+Kick Message: "You are using a blacklisted mod: {mod}. Please remove it to join this server."
+
+Blacklisted Mods:
+- xraymod
+- testmod
+- forge

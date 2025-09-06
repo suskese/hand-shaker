@@ -1,0 +1,13 @@
+name: HandShaker
+main: me.mklv.handshaker.paper.HandShakerPlugin
+version: ${version}
+api-version: "1.21"
+author: mklv
+description: Client mod handshake and blacklist validation
+softdepend: []
+commands:
+  handshaker:
+    description: HandShaker admin commands
+    usage: /handshaker reload | add <mod> | remove <mod>
+    permission: handshaker.admin
+    permission-message: You must be a server operator to use this command.

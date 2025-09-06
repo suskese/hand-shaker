@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "hand-shaker",
+	"version": "${version}",
+	"name": "Hand Shaker",
+	"description": "Sends client Fabric mod list to server plugin for blacklist enforcement.",
+	"authors": [
+		"MKLV"
+	],
+	"contact": {
+		"sources": "https://github.com/suskese/hand-shaker"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/hand-shaker/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"me.mklv.HandShaker"
+		]
+	},
+	"mixins": [
+		"hand-shaker.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.17.2",
+		"minecraft": "~1.21.8",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
