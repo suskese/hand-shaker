@@ -30,10 +30,3 @@ jobs:
           path: |
             build/libs/
             paper/build/libs/
-      - uses: kittaakos/upload-artifact-as-is@v1
-        with:
-          path: build/libs/*.jar
-      
-      - uses: kittaakos/upload-artifact-as-is@v1
-        with:
-          path: paper/build/libs/*.jar
