@@ -13,11 +13,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class HandShakerServer implements DedicatedServerModInitializer {
     public static final String MOD_ID = "hand-shaker";
@@ -25,6 +29,7 @@ public class HandShakerServer implements DedicatedServerModInitializer {
     private final Map<UUID, Set<String>> clientMods = new ConcurrentHashMap<>();
     private BlacklistConfig blacklistConfig;
     private MinecraftServer server;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     @Override
     public void onInitializeServer() {
@@ -33,6 +38,7 @@ public class HandShakerServer implements DedicatedServerModInitializer {
         blacklistConfig.load();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> this.server = server);
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> scheduler.shutdown());
 
         PayloadTypeRegistry.playC2S().register(HandShaker.ModsListPayload.ID, HandShaker.ModsListPayload.CODEC);
 
@@ -45,6 +51,17 @@ public class HandShakerServer implements DedicatedServerModInitializer {
             clientMods.put(player.getUuid(), mods);
             LOGGER.info("Received mod list from {}", player.getName().getString());
             blacklistConfig.checkPlayer(player, mods);
+        });
+
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            scheduler.schedule(() -> {
+                server.execute(() -> {
+                    if (handler.player.networkHandler == null) return; // Player disconnected
+                    if (!clientMods.containsKey(handler.player.getUuid())) {
+                        blacklistConfig.checkPlayer(handler.player, Collections.emptySet());
+                    }
+                });
+            }, 5, TimeUnit.SECONDS);
         });
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
@@ -68,10 +85,7 @@ public class HandShakerServer implements DedicatedServerModInitializer {
         if (server == null) return;
         LOGGER.info("Re-checking all online players against the mod blacklist...");
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            Set<String> mods = clientMods.get(player.getUuid());
-            if (mods != null) {
-                blacklistConfig.checkPlayer(player, mods);
-            }
+            blacklistConfig.checkPlayer(player, clientMods.getOrDefault(player.getUuid(), Collections.emptySet()));
         }
     }
 }

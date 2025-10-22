@@ -92,13 +92,15 @@ public class HandShakerPlugin extends JavaPlugin implements Listener {
         ClientInfo info = clients.get(player.getUniqueId());
         if (info == null) return; // Player data not yet received, do nothing.
 
-        boolean isFabric = info.fabric();
+        BlacklistConfig.Behavior behavior = blacklistConfig.getBehavior();
+
+        if (behavior == BlacklistConfig.Behavior.STRICT && !info.fabric()) {
+            player.kick(Component.text(blacklistConfig.getNoHandshakeKickMessage()).color(net.kyori.adventure.text.format.NamedTextColor.RED));
+            return;
+        }
+
         Set<String> mods = info.mods();
         Set<String> blacklisted = blacklistConfig.getBlacklistedMods();
-        BlacklistConfig.KickMode mode = blacklistConfig.getKickMode();
-
-        boolean shouldCheck = (mode == BlacklistConfig.KickMode.ALL) || (mode == BlacklistConfig.KickMode.FABRIC && isFabric);
-        if (!shouldCheck) return;
 
         List<String> hits = new ArrayList<>();
         for (String mod : blacklisted) {
