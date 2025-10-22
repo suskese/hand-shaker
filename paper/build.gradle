@@ -18,7 +18,6 @@ repositories {
 
 dependencies {
     compileOnly 'io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT'
-    // We only need adventure text formatting for nice kick messages (already included with Paper)
 }
 
 tasks.withType(JavaCompile).configureEach {
