@@ -34,10 +34,17 @@ public class HandShakerPlugin extends JavaPlugin implements Listener {
 
     public BlacklistConfig getBlacklistConfig() { return blacklistConfig; }
 
-    // For tab completion: get last mod list for a player
     public Set<String> getClientMods(UUID uuid) {
         ClientInfo info = clients.get(uuid);
         return info != null ? info.mods : null;
+    }
+
+    // New method to check all online players
+    public void checkAllPlayers() {
+        getLogger().info("Re-checking all online players against the mod blacklist...");
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            check(player);
+        }
     }
 
     @Override
@@ -83,14 +90,13 @@ public class HandShakerPlugin extends JavaPlugin implements Listener {
 
     private void check(Player player) {
         ClientInfo info = clients.get(player.getUniqueId());
-        boolean isFabric = info != null && info.fabric;
-        Set<String> mods = info != null ? info.mods : Collections.emptySet();
-        // Do not enforce against vanilla (no handshake received yet or timed out as vanilla)
+        if (info == null) return; // Player data not yet received, do nothing.
+
+        boolean isFabric = info.fabric();
+        Set<String> mods = info.mods();
         Set<String> blacklisted = blacklistConfig.getBlacklistedMods();
         BlacklistConfig.KickMode mode = blacklistConfig.getKickMode();
 
-        // If mode is ALL, kick any client (vanilla or fabric) with a blacklisted mod
-        // If mode is FABRIC, only kick fabric clients with a blacklisted mod
         boolean shouldCheck = (mode == BlacklistConfig.KickMode.ALL) || (mode == BlacklistConfig.KickMode.FABRIC && isFabric);
         if (!shouldCheck) return;
 
@@ -106,7 +112,6 @@ public class HandShakerPlugin extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        // schedule delayed check if no modlist arrives -> assume vanilla
         Bukkit.getScheduler().runTaskLater(this, () -> {
             clients.putIfAbsent(e.getPlayer().getUniqueId(), new ClientInfo(false, Collections.emptySet()));
             check(e.getPlayer());
