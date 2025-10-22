@@ -69,7 +69,7 @@ Blacklisted Mods:
 ## Compatibility
 
 - **Server**: Paper 1.21+ (should work on 1.20+ with minor tweaks)
-- **Client**: Fabric Loader 0.17.2+, Minecraft 1.21.8+
+- **Client**: Fabric Loader 0.17.3+, Minecraft 1.21+
 
 ## Building
 
