@@ -49,7 +49,8 @@ public class HandShakerCommand {
                                         context.getSource().sendFeedback(() -> Text.of("Player not found."), false);
                                         return 0;
                                     }
-                                    Set<String> mods = server.getClientMods().get(player.getUuid());
+                                    HandShakerServer.ClientInfo info = server.getClients().get(player.getUuid());
+                                    Set<String> mods = info != null ? info.mods() : null;
                                     if (mods == null) {
                                         context.getSource().sendFeedback(() -> Text.of("Mod list for " + playerName + " not found. Make sure they are online."), false);
                                         return 0;
@@ -64,7 +65,8 @@ public class HandShakerCommand {
                                 .suggests((context, builder) -> {
                                     ServerCommandSource source = context.getSource();
                                     if (source.getEntity() instanceof ServerPlayerEntity player) {
-                                        Set<String> mods = server.getClientMods().get(player.getUuid());
+                                        HandShakerServer.ClientInfo info = server.getClients().get(player.getUuid());
+                                        Set<String> mods = info != null ? info.mods() : null;
                                         if (mods != null) {
                                             return CommandSource.suggestMatching(mods, builder);
                                         }
@@ -100,8 +102,9 @@ public class HandShakerCommand {
                                     String playerName = StringArgumentType.getString(context, "player");
                                     ServerPlayerEntity player = context.getSource().getServer().getPlayerManager().getPlayer(playerName);
                                     if (player != null) {
-                                        Set<String> mods = server.getClientMods().get(player.getUuid());
-                                        if (mods != null && !mods.isEmpty()) {
+                                        HandShakerServer.ClientInfo info = server.getClients().get(player.getUuid());
+                                        Set<String> mods = info != null ? info.mods() : Collections.emptySet();
+                                        if (!mods.isEmpty()) {
                                             context.getSource().sendFeedback(() -> Text.of(playerName + "'s mods: " + String.join(", ", mods)), false);
                                         } else {
                                             context.getSource().sendFeedback(() -> Text.of("No mod list found for " + playerName), false);
@@ -116,7 +119,8 @@ public class HandShakerCommand {
                                             String playerName = StringArgumentType.getString(context, "player");
                                             ServerPlayerEntity player = context.getSource().getServer().getPlayerManager().getPlayer(playerName);
                                             if (player != null) {
-                                                Set<String> mods = server.getClientMods().get(player.getUuid());
+                                                HandShakerServer.ClientInfo info = server.getClients().get(player.getUuid());
+                                                Set<String> mods = info != null ? info.mods() : null;
                                                 if (mods != null) {
                                                     return CommandSource.suggestMatching(mods, builder);
                                                 }
@@ -132,9 +136,10 @@ public class HandShakerCommand {
                                             }
 
                                             String modId = StringArgumentType.getString(context, "mod");
-                                            Set<String> mods = server.getClientMods().get(player.getUuid());
+                                            HandShakerServer.ClientInfo info = server.getClients().get(player.getUuid());
+                                            Set<String> mods = info != null ? info.mods() : Collections.emptySet();
 
-                                            if (mods == null || !mods.contains(modId)) {
+                                            if (!mods.contains(modId)) {
                                                 context.getSource().sendFeedback(() -> Text.of(playerName + " does not have the mod " + modId), false);
                                                 return 1;
                                             }

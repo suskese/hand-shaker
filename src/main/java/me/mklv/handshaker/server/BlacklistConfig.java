@@ -28,6 +28,7 @@ public class BlacklistConfig {
             .setPrettyPrinting()
             .registerTypeAdapter(Behavior.class, new BehaviorDeserializer())
             .registerTypeAdapter(Mode.class, new ModeDeserializer())
+            .registerTypeAdapter(IntegrityMode.class, new IntegrityModeDeserializer())
             .create();
     private final HandShakerServer server;
     private File configFile;
@@ -38,8 +39,11 @@ public class BlacklistConfig {
     }
 
     private static class ConfigData {
+        IntegrityMode integrity = IntegrityMode.SIGNED;
         Mode mode = Mode.BLACKLIST;
-        Behavior behavior = Behavior.VANILLA;
+        Behavior behavior = Behavior.STRICT;
+        @SerializedName("invalid_signature_kick_message")
+        String invalidSignatureKickMessage = "Invalid client signature. Please use the official client.";
         @SerializedName("kick_message")
         String kickMessage = "You are using a blacklisted mod: {mod}. Please remove it to join this server.";
         @SerializedName("missing_mod_message")
@@ -59,10 +63,20 @@ public class BlacklistConfig {
     }
 
     public enum Mode {BLACKLIST, WHITELIST}
-
     public enum Behavior {STRICT, VANILLA}
-
+    public enum IntegrityMode {SIGNED, DEV}
     public enum KickMode {ALL, FABRIC} // For backwards compatibility
+
+    public static class IntegrityModeDeserializer implements JsonDeserializer<IntegrityMode> {
+        @Override
+        public IntegrityMode deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            try {
+                return IntegrityMode.valueOf(json.getAsString().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return IntegrityMode.DEV; // default value
+            }
+        }
+    }
 
     public static class ModeDeserializer implements JsonDeserializer<Mode> {
         @Override
@@ -118,57 +132,32 @@ public class BlacklistConfig {
         }
     }
 
-    public Mode getMode() {
-        return configData.mode;
-    }
+    public IntegrityMode getIntegrityMode() { return configData.integrity; }
+    public Mode getMode() { return configData.mode; }
+    public Behavior getBehavior() { return configData.behavior; }
+    public String getInvalidSignatureKickMessage() { return configData.invalidSignatureKickMessage; }
+    public String getKickMessage() { return configData.kickMessage; }
+    public String getNoHandshakeKickMessage() { return configData.noHandshakeKickMessage; }
+    public String getMissingWhitelistModMessage() { return configData.missingWhitelistModMessage; }
+    public String getExtraWhitelistModMessage() { return configData.extraWhitelistModMessage; }
+    public Set<String> getBlacklistedMods() { return Collections.unmodifiableSet(configData.blacklistedMods); }
+    public Set<String> getWhitelistedMods() { return Collections.unmodifiableSet(configData.whitelistedMods); }
 
     public void setMode(Mode mode) {
         configData.mode = mode;
         save();
     }
 
-    public Behavior getBehavior() {
-        return configData.behavior;
-    }
-
-    public String getKickMessage() {
-        return configData.kickMessage;
-    }
-
-    public String getNoHandshakeKickMessage() {
-        return configData.noHandshakeKickMessage;
-    }
-
-    public String getMissingWhitelistModMessage() {
-        return configData.missingWhitelistModMessage;
-    }
-
-    public String getExtraWhitelistModMessage() {
-        return configData.extraWhitelistModMessage;
-    }
-
-    public Set<String> getBlacklistedMods() {
-        return Collections.unmodifiableSet(configData.blacklistedMods);
-    }
-
     public boolean addMod(String modId) {
         boolean added = configData.blacklistedMods.add(modId.toLowerCase(Locale.ROOT));
-        if (added) {
-            save();
-        }
+        if (added) save();
         return added;
     }
 
     public boolean removeMod(String modId) {
         boolean removed = configData.blacklistedMods.remove(modId.toLowerCase(Locale.ROOT));
-        if (removed) {
-            save();
-        }
+        if (removed) save();
         return removed;
-    }
-
-    public Set<String> getWhitelistedMods() {
-        return Collections.unmodifiableSet(configData.whitelistedMods);
     }
 
     public void setWhitelist(Set<String> mods) {
@@ -179,13 +168,22 @@ public class BlacklistConfig {
         save();
     }
 
-    public void checkPlayer(ServerPlayerEntity player, Set<String> mods) {
-        boolean isFabric = !mods.isEmpty();
+    public void checkPlayer(ServerPlayerEntity player, HandShakerServer.ClientInfo info) {
+        if (info == null) return; // Should not happen, but safeguard
+
+        boolean isFabric = !info.mods().isEmpty();
         if (getBehavior() == Behavior.STRICT && !isFabric) {
             player.networkHandler.disconnect(Text.of(getNoHandshakeKickMessage()));
             return;
         }
 
+        // Integrity Check
+        if (getIntegrityMode() == IntegrityMode.SIGNED && !info.signatureVerified()) {
+            player.networkHandler.disconnect(Text.of(getInvalidSignatureKickMessage()));
+            return;
+        }
+
+        Set<String> mods = info.mods();
         if (getMode() == Mode.BLACKLIST) {
             List<String> hits = new ArrayList<>();
             for (String mod : getBlacklistedMods()) {
