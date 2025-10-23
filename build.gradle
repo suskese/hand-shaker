@@ -81,3 +81,32 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+afterEvaluate {
+    tasks.register('mergeJars', Jar) {
+        group = 'build'
+        description = 'Merges the fabric and paper jars into a single jar'
+
+        dependsOn 'remapJar'
+        dependsOn project(':paper').tasks.named('jar')
+
+        def fabricJar = tasks.remapJar.outputs.files.singleFile
+        def paperJar = project(':paper').tasks.named('jar').get().archiveFile.get().asFile
+
+        from(zipTree(fabricJar))
+        from(zipTree(paperJar)) {
+            exclude 'META-INF/MANIFEST.MF'
+        }
+
+        archiveBaseName.set("${project.archives_base_name}-paper+fabric")
+        destinationDirectory.set(file("$buildDir/output"))
+
+        manifest {
+            from(zipTree(fabricJar).matching {
+                include 'META-INF/MANIFEST.MF'
+            }.files.first())
+        }
+    }
+
+    build.finalizedBy tasks.named('mergeJars')
+}
