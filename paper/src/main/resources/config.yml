@@ -4,9 +4,23 @@ Behavior: Strict
 #"Strict" - Kick clients with blacklisted mods + Kick non Hand-shaker mod clients
 #"Vanilla" - Kick clients with blacklisted mods but ignoring non Hand-shaker mod clients (Could be dangeours if clients spoofs clients)
 
+Integrity: Signed
+
+#"Signed" - Accepts only-signed handshaker copies, preventing using modified handshaker mod
+#"Dev" - Accepts non-signed copys, Only for personal use or self signed copies (Could be potentionaly dangerous)
+
+Operation Mode: blacklist
+
+#"blacklist" - Blocks join requests with blacklisted mods
+#"whitelist" - Accepts ONLY allowed mods, any non-whitelisted mod will cause kick. Set only after running /handshake whitelist_update to whitelist all mods from current client instance, otherwise you newer could join unless manually setting Operation Mode: blacklist
+
 Kick Message: "You are using a blacklisted mod: {mod}. Please remove it to join this server."
 
 Missing mod message: "To connect to this server please download 'Hand-shaker' mod."
+
+
+Whitelisted Mods:
+- handshaker
 
 Blacklisted Mods:
 - xraymod

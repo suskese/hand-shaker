@@ -41,7 +41,7 @@ public class HandShakerPlugin extends JavaPlugin implements Listener {
 
     // New method to check all online players
     public void checkAllPlayers() {
-        getLogger().info("Re-checking all online players against the mod blacklist...");
+        getLogger().info("Re-checking all online players...");
         for (Player player : Bukkit.getOnlinePlayers()) {
             check(player);
         }
@@ -92,23 +92,47 @@ public class HandShakerPlugin extends JavaPlugin implements Listener {
         ClientInfo info = clients.get(player.getUniqueId());
         if (info == null) return; // Player data not yet received, do nothing.
 
-        BlacklistConfig.Behavior behavior = blacklistConfig.getBehavior();
-
-        if (behavior == BlacklistConfig.Behavior.STRICT && !info.fabric()) {
+        if (blacklistConfig.getBehavior() == BlacklistConfig.Behavior.STRICT && !info.fabric()) {
             player.kick(Component.text(blacklistConfig.getNoHandshakeKickMessage()).color(net.kyori.adventure.text.format.NamedTextColor.RED));
             return;
         }
 
         Set<String> mods = info.mods();
-        Set<String> blacklisted = blacklistConfig.getBlacklistedMods();
+        if (blacklistConfig.getMode() == BlacklistConfig.Mode.BLACKLIST) {
+            List<String> hits = new ArrayList<>();
+            for (String mod : blacklistConfig.getBlacklistedMods()) {
+                if (mods.contains(mod)) hits.add(mod);
+            }
+            if (!hits.isEmpty()) {
+                String msg = blacklistConfig.getKickMessage().replace("{mod}", String.join(", ", hits));
+                player.kick(Component.text(msg).color(net.kyori.adventure.text.format.NamedTextColor.RED));
+            }
+        } else { // WHITELIST
+            if (info.fabric() || !blacklistConfig.getWhitelistedMods().isEmpty()) {
+                Set<String> whitelistedMods = blacklistConfig.getWhitelistedMods();
+                List<String> missing = new ArrayList<>();
+                for (String mod : whitelistedMods) {
+                    if (!mods.contains(mod)) {
+                        missing.add(mod);
+                    }
+                }
+                if (!missing.isEmpty()) {
+                    String msg = blacklistConfig.getMissingWhitelistModMessage().replace("{mod}", String.join(", ", missing));
+                    player.kick(Component.text(msg).color(net.kyori.adventure.text.format.NamedTextColor.RED));
+                    return;
+                }
 
-        List<String> hits = new ArrayList<>();
-        for (String mod : blacklisted) {
-            if (mods.contains(mod)) hits.add(mod);
-        }
-        if (!hits.isEmpty()) {
-            String msg = blacklistConfig.getKickMessage().replace("{mod}", String.join(", ", hits));
-            player.kick(Component.text(msg).color(net.kyori.adventure.text.format.NamedTextColor.RED));
+                List<String> extra = new ArrayList<>();
+                for (String mod : mods) {
+                    if (!whitelistedMods.contains(mod)) {
+                        extra.add(mod);
+                    }
+                }
+                if (!extra.isEmpty()) {
+                    String msg = blacklistConfig.getExtraWhitelistModMessage().replace("{mod}", String.join(", ", extra));
+                    player.kick(Component.text(msg).color(net.kyori.adventure.text.format.NamedTextColor.RED));
+                }
+            }
         }
     }
 

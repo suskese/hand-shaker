@@ -27,6 +27,7 @@ public class BlacklistConfig {
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .registerTypeAdapter(Behavior.class, new BehaviorDeserializer())
+            .registerTypeAdapter(Mode.class, new ModeDeserializer())
             .create();
     private final HandShakerServer server;
     private File configFile;
@@ -37,21 +38,42 @@ public class BlacklistConfig {
     }
 
     private static class ConfigData {
+        Mode mode = Mode.BLACKLIST;
         Behavior behavior = Behavior.VANILLA;
         @SerializedName("kick_message")
         String kickMessage = "You are using a blacklisted mod: {mod}. Please remove it to join this server.";
         @SerializedName("missing_mod_message")
         String noHandshakeKickMessage = "To connect to this server please download 'Hand-shaker' mod.";
+        @SerializedName("missing_whitelist_mod_message")
+        String missingWhitelistModMessage = "You are missing required mods: {mod}. Please install them to join this server.";
+        @SerializedName("extra_whitelist_mod_message")
+        String extraWhitelistModMessage = "You have mods that are not on the whitelist: {mod}. Please remove them to join.";
         @SerializedName("blacklisted_mods")
         Set<String> blacklistedMods = new LinkedHashSet<>();
+        @SerializedName("whitelisted_mods")
+        Set<String> whitelistedMods = new LinkedHashSet<>();
 
         // For backwards compatibility
         @SerializedName("kickMode")
         KickMode oldKickMode = null;
     }
 
-    public enum Behavior { STRICT, VANILLA }
-    public enum KickMode { ALL, FABRIC } // For backwards compatibility
+    public enum Mode {BLACKLIST, WHITELIST}
+
+    public enum Behavior {STRICT, VANILLA}
+
+    public enum KickMode {ALL, FABRIC} // For backwards compatibility
+
+    public static class ModeDeserializer implements JsonDeserializer<Mode> {
+        @Override
+        public Mode deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            try {
+                return Mode.valueOf(json.getAsString().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return Mode.BLACKLIST; // default value
+            }
+        }
+    }
 
     public static class BehaviorDeserializer implements JsonDeserializer<Behavior> {
         @Override
@@ -96,6 +118,15 @@ public class BlacklistConfig {
         }
     }
 
+    public Mode getMode() {
+        return configData.mode;
+    }
+
+    public void setMode(Mode mode) {
+        configData.mode = mode;
+        save();
+    }
+
     public Behavior getBehavior() {
         return configData.behavior;
     }
@@ -106,6 +137,14 @@ public class BlacklistConfig {
 
     public String getNoHandshakeKickMessage() {
         return configData.noHandshakeKickMessage;
+    }
+
+    public String getMissingWhitelistModMessage() {
+        return configData.missingWhitelistModMessage;
+    }
+
+    public String getExtraWhitelistModMessage() {
+        return configData.extraWhitelistModMessage;
     }
 
     public Set<String> getBlacklistedMods() {
@@ -128,6 +167,18 @@ public class BlacklistConfig {
         return removed;
     }
 
+    public Set<String> getWhitelistedMods() {
+        return Collections.unmodifiableSet(configData.whitelistedMods);
+    }
+
+    public void setWhitelist(Set<String> mods) {
+        configData.whitelistedMods = new LinkedHashSet<>();
+        for (String mod : mods) {
+            configData.whitelistedMods.add(mod.toLowerCase(Locale.ROOT));
+        }
+        save();
+    }
+
     public void checkPlayer(ServerPlayerEntity player, Set<String> mods) {
         boolean isFabric = !mods.isEmpty();
         if (getBehavior() == Behavior.STRICT && !isFabric) {
@@ -135,15 +186,43 @@ public class BlacklistConfig {
             return;
         }
 
-        List<String> hits = new ArrayList<>();
-        for (String mod : getBlacklistedMods()) {
-            if (mods.contains(mod)) {
-                hits.add(mod);
+        if (getMode() == Mode.BLACKLIST) {
+            List<String> hits = new ArrayList<>();
+            for (String mod : getBlacklistedMods()) {
+                if (mods.contains(mod)) {
+                    hits.add(mod);
+                }
             }
-        }
-        if (!hits.isEmpty()) {
-            String msg = getKickMessage().replace("{mod}", String.join(", ", hits));
-            player.networkHandler.disconnect(Text.of(msg));
+            if (!hits.isEmpty()) {
+                String msg = getKickMessage().replace("{mod}", String.join(", ", hits));
+                player.networkHandler.disconnect(Text.of(msg));
+            }
+        } else { // WHITELIST
+            if (isFabric || !getWhitelistedMods().isEmpty()) {
+                Set<String> whitelistedMods = getWhitelistedMods();
+                List<String> missing = new ArrayList<>();
+                for (String mod : whitelistedMods) {
+                    if (!mods.contains(mod)) {
+                        missing.add(mod);
+                    }
+                }
+                if (!missing.isEmpty()) {
+                    String msg = getMissingWhitelistModMessage().replace("{mod}", String.join(", ", missing));
+                    player.networkHandler.disconnect(Text.of(msg));
+                    return;
+                }
+
+                List<String> extra = new ArrayList<>();
+                for (String mod : mods) {
+                    if (!whitelistedMods.contains(mod)) {
+                        extra.add(mod);
+                    }
+                }
+                if (!extra.isEmpty()) {
+                    String msg = getExtraWhitelistModMessage().replace("{mod}", String.join(", ", extra));
+                    player.networkHandler.disconnect(Text.of(msg));
+                }
+            }
         }
     }
 }

@@ -9,6 +9,6 @@ commands:
   handshaker:
     aliases: [hs]
     description: HandShaker admin commands
-    usage: /handshaker reload | add <mod> | remove <mod> | player <player> <mod>
+    usage: /handshaker reload | add <mod> | remove <mod> | player <player> [mod] | mode <blacklist|whitelist> | whitelist_update <player>
     permission: handshaker.admin
     permission-message: You must be a server operator to use this command.

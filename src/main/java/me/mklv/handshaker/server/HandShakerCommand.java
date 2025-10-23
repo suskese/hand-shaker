@@ -7,6 +7,7 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
+import java.util.Collections;
 import java.util.Set;
 
 import static net.minecraft.server.command.CommandManager.argument;
@@ -19,10 +20,45 @@ public class HandShakerCommand {
                 .then(literal("reload")
                         .executes(context -> {
                             server.getBlacklistConfig().load();
-                            context.getSource().sendFeedback(() -> Text.of("HandShaker blacklist reloaded."), true);
+                            context.getSource().sendFeedback(() -> Text.of("HandShaker config reloaded."), true);
                             server.checkAllPlayers();
                             return 1;
                         }))
+                .then(literal("mode")
+                        .then(literal("blacklist")
+                                .executes(context -> {
+                                    server.getBlacklistConfig().setMode(BlacklistConfig.Mode.BLACKLIST);
+                                    context.getSource().sendFeedback(() -> Text.of("HandShaker mode set to blacklist."), true);
+                                    server.checkAllPlayers();
+                                    return 1;
+                                }))
+                        .then(literal("whitelist")
+                                .executes(context -> {
+                                    server.getBlacklistConfig().setMode(BlacklistConfig.Mode.WHITELIST);
+                                    context.getSource().sendFeedback(() -> Text.of("HandShaker mode set to whitelist."), true);
+                                    server.checkAllPlayers();
+                                    return 1;
+                                })))
+                .then(literal("whitelist_update")
+                        .then(argument("player", StringArgumentType.string())
+                                .suggests((context, builder) -> CommandSource.suggestMatching(context.getSource().getServer().getPlayerNames(), builder))
+                                .executes(context -> {
+                                    String playerName = StringArgumentType.getString(context, "player");
+                                    ServerPlayerEntity player = context.getSource().getServer().getPlayerManager().getPlayer(playerName);
+                                    if (player == null) {
+                                        context.getSource().sendFeedback(() -> Text.of("Player not found."), false);
+                                        return 0;
+                                    }
+                                    Set<String> mods = server.getClientMods().get(player.getUuid());
+                                    if (mods == null) {
+                                        context.getSource().sendFeedback(() -> Text.of("Mod list for " + playerName + " not found. Make sure they are online."), false);
+                                        return 0;
+                                    }
+                                    server.getBlacklistConfig().setWhitelist(mods);
+                                    context.getSource().sendFeedback(() -> Text.of("Whitelist updated with " + playerName + "'s mods. " + mods.size() + " mods added."), true);
+                                    server.checkAllPlayers();
+                                    return 1;
+                                })))
                 .then(literal("add")
                         .then(argument("mod", StringArgumentType.string())
                                 .suggests((context, builder) -> {

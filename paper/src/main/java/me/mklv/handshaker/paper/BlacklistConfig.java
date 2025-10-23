@@ -2,17 +2,25 @@ package me.mklv.handshaker.paper;
 
 import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 public class BlacklistConfig {
     private final HandShakerPlugin plugin;
     private File file;
     private YamlConfiguration config;
+
+    public enum Mode {BLACKLIST, WHITELIST}
     public enum Behavior { STRICT, VANILLA }
+
+    private Mode mode = Mode.BLACKLIST;
     private Behavior behavior = Behavior.VANILLA;
     private final Set<String> blacklistedMods = new LinkedHashSet<>();
-    private String kickMessage = "Remove: {mod}";
-    private String noHandshakeKickMessage = "This server requires Hand-shaker mod.";
+    private final Set<String> whitelistedMods = new LinkedHashSet<>();
+    private String kickMessage = "You are using a blacklisted mod: {mod}. Please remove it to join this server.";
+    private String noHandshakeKickMessage = "To connect to this server please download 'Hand-shaker' mod.";
+    private String missingWhitelistModMessage = "You are missing required mods: {mod}. Please install them to join this server.";
+    private String extraWhitelistModMessage = "You have mods that are not on the whitelist: {mod}. Please remove them to join.";
 
     public BlacklistConfig(HandShakerPlugin plugin) {
         this.plugin = plugin;
@@ -29,20 +37,27 @@ public class BlacklistConfig {
         }
         config = YamlConfiguration.loadConfiguration(file);
         blacklistedMods.clear();
+        whitelistedMods.clear();
+
+        // Parse Mode
+        String modeString = config.getString("Operation Mode", "blacklist").toUpperCase(Locale.ROOT);
+        mode = modeString.equals("WHITELIST") ? Mode.WHITELIST : Mode.BLACKLIST;
 
         // Parse Behavior
         String behaviorString = config.getString("Behavior", "").toUpperCase(Locale.ROOT);
         if (behaviorString.isEmpty()) {
             // Backwards compatibility
-            String mode = config.getString("Kick Mode", config.getString("KickMode", "Fabric")).toUpperCase(Locale.ROOT);
-            behavior = mode.startsWith("ALL") ? Behavior.STRICT : Behavior.VANILLA;
+            String oldMode = config.getString("Kick Mode", config.getString("KickMode", "Fabric")).toUpperCase(Locale.ROOT);
+            behavior = oldMode.startsWith("ALL") ? Behavior.STRICT : Behavior.VANILLA;
         } else {
             behavior = behaviorString.startsWith("STRICT") ? Behavior.STRICT : Behavior.VANILLA;
         }
 
         // Parse Kick Message
-        kickMessage = config.getString("Kick Message", "Remove: {mod}");
-        noHandshakeKickMessage = config.getString("Missing mod message", "This server requires Hand-shaker mod.");
+        kickMessage = config.getString("Kick Message", "You are using a blacklisted mod: {mod}. Please remove it to join this server.");
+        noHandshakeKickMessage = config.getString("Missing mod message", "To connect to this server please download 'Hand-shaker' mod.");
+        missingWhitelistModMessage = config.getString("Missing whitelist mod message", "You are missing required mods: {mod}. Please install them to join this server.");
+        extraWhitelistModMessage = config.getString("Extra whitelist mod message", "You have mods that are not on the whitelist: {mod}. Please remove them to join.");
 
         // Parse Blacklisted Mods
         if (config.isList("Blacklisted Mods")) {
@@ -50,28 +65,53 @@ public class BlacklistConfig {
                 if (o != null) blacklistedMods.add(o.toString().toLowerCase(Locale.ROOT));
             }
         }
+
+        // Parse Whitelisted Mods
+        if (config.isList("Whitelisted Mods")) {
+            for (Object o : config.getList("Whitelisted Mods")) {
+                if (o != null) whitelistedMods.add(o.toString().toLowerCase(Locale.ROOT));
+            }
+        }
     }
 
+    public Mode getMode() { return mode; }
+    public void setMode(Mode mode) { this.mode = mode; save(); }
     public Behavior getBehavior() { return behavior; }
     public Set<String> getBlacklistedMods() { return Collections.unmodifiableSet(blacklistedMods); }
+    public Set<String> getWhitelistedMods() { return Collections.unmodifiableSet(whitelistedMods); }
     public String getKickMessage() { return kickMessage; }
     public String getNoHandshakeKickMessage() { return noHandshakeKickMessage; }
+    public String getMissingWhitelistModMessage() { return missingWhitelistModMessage; }
+    public String getExtraWhitelistModMessage() { return extraWhitelistModMessage; }
 
     public boolean addMod(String modId) {
         boolean added = blacklistedMods.add(modId.toLowerCase(Locale.ROOT));
-        save();
+        if(added) save();
         return added;
     }
     public boolean removeMod(String modId) {
         boolean removed = blacklistedMods.remove(modId.toLowerCase(Locale.ROOT));
-        save();
+        if(removed) save();
         return removed;
     }
+
+    public void setWhitelistedMods(Set<String> mods) {
+        whitelistedMods.clear();
+        for (String mod : mods) {
+            whitelistedMods.add(mod.toLowerCase(Locale.ROOT));
+        }
+        save();
+    }
+
     public void save() {
+        config.set("Operation Mode", mode == Mode.WHITELIST ? "whitelist" : "blacklist");
         config.set("Behavior", behavior == Behavior.STRICT ? "Strict" : "Vanilla");
         config.set("Kick Message", kickMessage);
         config.set("Missing mod message", noHandshakeKickMessage);
+        config.set("Missing whitelist mod message", missingWhitelistModMessage);
+        config.set("Extra whitelist mod message", extraWhitelistModMessage);
         config.set("Blacklisted Mods", new ArrayList<>(blacklistedMods));
-        try { config.save(file); } catch (Exception ignored) {}
+        config.set("Whitelisted Mods", new ArrayList<>(whitelistedMods));
+        try { config.save(file); } catch (IOException e) { plugin.getLogger().severe("Could not save config.yml!"); }
     }
 }
