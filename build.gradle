@@ -87,26 +87,32 @@ afterEvaluate {
         group = 'build'
         description = 'Merges the fabric and paper jars into a single jar'
 
+        // Declare proper task dependencies
         dependsOn(tasks.named('remapJar'))
         dependsOn(project(':paper').tasks.named('jar'))
 
-        doFirst {
-            def fabricJar = tasks.named('remapJar').get().outputs.files.singleFile
-            def paperJar = project(':paper').tasks.named('jar').get().archiveFile.get().asFile
+        // Lazy references to the jars (no .get() during configuration)
+        def fabricJarProvider = tasks.named('remapJar').flatMap { it.outputs.files.singleFile }
+        def paperJarProvider = project(':paper').tasks.named('jar').flatMap { it.archiveFile }
 
-            from(zipTree(fabricJar))
-            from(zipTree(paperJar)) {
-                exclude 'META-INF/MANIFEST.MF'
-            }
+        from({
+            zipTree(fabricJarProvider.get())
+        })
+        from({
+            zipTree(paperJarProvider.get())
+        }) {
+            exclude 'META-INF/MANIFEST.MF'
+        }
 
-            archiveBaseName.set("${project.archives_base_name}-merged")
-            destinationDirectory.set(file("$buildDir/output"))
+        archiveBaseName.set("${project.archives_base_name}-merged")
+        destinationDirectory.set(layout.buildDirectory.dir("output"))
 
-            manifest {
-                from(zipTree(fabricJar).matching {
+        manifest {
+            from({
+                zipTree(fabricJarProvider.get()).matching {
                     include 'META-INF/MANIFEST.MF'
-                }.files.first())
-            }
+                }.files.first()
+            })
         }
     }
 
