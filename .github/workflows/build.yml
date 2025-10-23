@@ -48,7 +48,7 @@ jobs:
           name: paper-jar
           path: paper/build/libs/*.jar
 
-      - name: Upload all artifacts (optional ZIP)
+      - name: Upload all artifacts (ZIP)
         uses: actions/upload-artifact@v4
         with:
           name: all-artifacts
